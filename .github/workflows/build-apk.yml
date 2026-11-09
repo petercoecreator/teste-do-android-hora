@@ -22,10 +22,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Configurar Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Instalar plataforma Android 35
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      # O runner Ubuntu do GitHub já inclui Android SDK.
+      # Evita setup-android tentar instalar o pacote obsoleto "tools".
       - name: Instalar Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
