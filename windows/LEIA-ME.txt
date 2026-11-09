@@ -1,0 +1,12 @@
+SERVIDOR WINDOWS — RELÓGIO REMOTO
+
+1. Tenha Python instalado no Windows.
+2. Clique com o botão direito no Prompt de Comando e escolha "Executar como administrador".
+3. Entre na pasta windows do projeto.
+4. Execute: py servidor.py
+5. Anote o PIN e o IP exibidos.
+6. No aplicativo, informe o IP e o PIN e toque em CONECTAR.
+7. Deixe a janela do servidor aberta durante o uso.
+
+Se o Firewall perguntar, permita somente em redes privadas.
+Não encaminhe a porta 8765 para a internet.
