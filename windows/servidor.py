@@ -17,7 +17,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap, QImage, QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QPushButton, QVBoxLayout,
-    QHBoxLayout, QFrame, QSystemTrayIcon, QMenu, QMessageBox, QCheckBox
+    QHBoxLayout, QFrame, QSystemTrayIcon, QMenu, QMessageBox, QCheckBox, QStyle
 )
 
 PORT = 8765
@@ -308,7 +308,7 @@ class MainWindow(QMainWindow):
 
         self.tray = QSystemTrayIcon(self)
         self.tray.setToolTip("Relógio Remoto — servidor ativo")
-        self.tray.setIcon(self.style().standardIcon(self.style().SP_ComputerIcon))
+        self.tray.setIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
         menu = QMenu()
         open_action = QAction("Abrir Relógio Remoto", self)
         open_action.triggered.connect(self.showNormal)
