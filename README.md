@@ -1,38 +1,14 @@
-# Relógio Remoto 2.0
+# Relógio Remoto
 
-Aplicativo Android para consultar e ajustar a data e a hora de um computador Windows na mesma rede Wi-Fi.
+Aplicativos Android e Windows para consultar e ajustar a data e a hora do computador na mesma rede local.
 
-## Downloads
+## Windows
+Baixe e execute `RelogioRemoto-Setup.exe`. O instalador cria atalhos no menu Iniciar e, opcionalmente, na área de trabalho. Pode configurar a inicialização automática. O aplicativo permanece na bandeja do sistema quando a janela é fechada.
 
-Quando a compilação automática terminar, abra a página Releases e baixe:
-- app-debug.apk — instale no celular Android.
-- RelogioRemoto-Servidor.exe — execute no computador Windows.
+O servidor usa a porta TCP 8765 e gera QR Code, IP e PIN a cada inicialização ou quando solicitado no aplicativo.
 
-Downloads: https://github.com/petercoecreator/teste-do-android-hora/releases/latest
+## Android
+Instale `app-debug.apk`, permita o acesso à câmera quando solicitado e leia o QR Code exibido no Windows.
 
-## Como conectar
-
-1. No Windows, execute RelogioRemoto-Servidor.exe.
-2. Confirme a solicitação de administrador do Windows.
-3. O servidor mostra o IP e o PIN e abre a imagem do QR Code.
-4. No Android, abra o app e toque em LER QR CODE DO COMPUTADOR.
-5. Aponte a câmera para o QR Code.
-6. Depois de conectado, consulte o horário ou escolha uma nova data e hora.
-7. Para alterar o relógio, toque em APLICAR NO PC e confirme.
-
-O computador e o celular precisam estar na mesma rede Wi-Fi. Mantenha o servidor aberto durante o uso. Reinicie o servidor para gerar outro PIN e permitir um novo pareamento.
-
-## Segurança e limitações
-
-- A conexão usa HTTP e foi projetada somente para uma rede local privada e confiável.
-- Não encaminhe a porta TCP 8765 para a internet.
-- O PIN é temporário e o servidor aceita um pareamento por execução.
-- O executável solicita elevação pelo UAC do Windows; não tenta contornar a confirmação.
-- Alterar o relógio pode afetar certificados, autenticação, jogos, atualizações e outros programas.
-- O app não altera o fuso horário nem configura a sincronização automática do Windows.
-
-## Código-fonte
-
-- Android: pasta android/
-- Servidor Windows: windows/servidor.py
-- Compilação: .github/workflows/build-apk.yml
+## Segurança
+A conexão HTTP foi projetada somente para uma rede local privada e confiável. Não encaminhe a porta 8765 para a internet. Alterar o relógio pode afetar certificados, autenticação, jogos e atualizações.
