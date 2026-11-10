@@ -1,7 +1,10 @@
 package br.com.relogioremoto;
 
 import android.app.*;
-import android.content.pm.PackageManager;\nimport androidx.core.app.ActivityCompat;\nimport androidx.core.content.ContextCompat;\nimport com.journeyapps.barcodescanner.CaptureActivity;
+import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import com.journeyapps.barcodescanner.CaptureActivity;
 import android.os.Bundle;
 import android.graphics.Color;
 import android.graphics.Typeface;
