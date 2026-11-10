@@ -43,7 +43,7 @@ public class MainActivity extends Activity {
         page.addView(title);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("Quatro versos da sua música, direto na tela de bloqueio.");
+        subtitle.setText("Vinil animado e letras do Spotify na tela de bloqueio.");
         subtitle.setTextSize(15);
         subtitle.setTextColor(Color.rgb(174, 179, 194));
         subtitle.setGravity(Gravity.CENTER);
@@ -63,7 +63,7 @@ public class MainActivity extends Activity {
         page.addView(preview, pp);
 
         TextView instructions = new TextView(this);
-        instructions.setText("Para funcionar:\n1. Toque em ativar acesso às notificações.\n2. Permita o acesso do LyricLock.\n3. Volte ao app e deixe uma música tocar no Spotify.\n\nO LyricLock lê a sessão de mídia do Spotify e procura letras sincronizadas no LRCLIB. A letra aparece em uma notificação pública na tela bloqueada. A exibição pode variar conforme as configurações de notificações da Samsung.");
+        instructions.setText("Para funcionar:\n1. Toque em ativar acesso às notificações.\n2. Permita o acesso do LyricLock.\n3. Volte ao app e deixe uma música tocar no Spotify.\n\nO LyricLock lê a sessão de mídia do Spotify e procura letras sincronizadas no LRCLIB. A letra aparece na notificação e no papel de parede animado. A exibição pode variar conforme as configurações de notificações da Samsung.");
         instructions.setTextSize(14);
         instructions.setTextColor(Color.rgb(190, 194, 207));
         instructions.setLineSpacing(dp(5), 1f);
@@ -78,6 +78,21 @@ public class MainActivity extends Activity {
         bp.topMargin = dp(20);
         page.addView(enable, bp);
         enable.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+
+        Button wallpaper = new Button(this);
+        wallpaper.setText("Aplicar na tela de bloqueio");
+        wallpaper.setAllCaps(false);
+        wallpaper.setTextColor(Color.WHITE);
+        wallpaper.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(55, 65, 105)));
+        LinearLayout.LayoutParams wp = new LinearLayout.LayoutParams(-1, dp(54));
+        wp.topMargin = dp(10);
+        page.addView(wallpaper, wp);
+        wallpaper.setOnClickListener(v -> {
+            Intent intent = new Intent("android.service.wallpaper.CHANGE_LIVE_WALLPAPER");
+            intent.putExtra("android.service.wallpaper.extra.LIVE_WALLPAPER_COMPONENT",
+                new android.content.ComponentName(this, LyricsLiveWallpaper.class));
+            startActivity(intent);
+        });
 
         TextView hint = new TextView(this);
         hint.setText("Depois, mantenha as notificações do LyricLock permitidas na tela de bloqueio.");
