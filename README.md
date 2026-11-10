@@ -12,3 +12,6 @@ Instale `app-debug.apk`, permita o acesso à câmera quando solicitado e leia o 
 
 ## Segurança
 A conexão HTTP foi projetada somente para uma rede local privada e confiável. Não encaminhe a porta 8765 para a internet. Alterar o relógio pode afetar certificados, autenticação, jogos e atualizações.
+
+
+O leitor QR do Android solicita a permissão da câmera na primeira utilização.
