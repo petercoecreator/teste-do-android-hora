@@ -7,6 +7,7 @@ import android.content.ComponentName;
 import android.media.MediaMetadata;
 import android.media.session.PlaybackState;
 import android.media.session.MediaController;
+import android.media.session.MediaSessionManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -68,7 +69,8 @@ public class LyricsNotificationListener extends NotificationListenerService {
 
     private void refreshSpotifySession() {
         try {
-            List<MediaController> sessions = getActiveSessions(new ComponentName(this, LyricsNotificationListener.class));
+            MediaSessionManager manager = (MediaSessionManager) getSystemService(MEDIA_SESSION_SERVICE);
+            List<MediaController> sessions = manager.getActiveSessions(new ComponentName(this, LyricsNotificationListener.class));
             MediaController found = null;
             if (sessions != null) {
                 for (MediaController c : sessions) {
