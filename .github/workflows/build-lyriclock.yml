@@ -1,5 +1,7 @@
 name: Build LyricLock APK
 
+# Rebuild after fixing the media-session API
+
 on:
   push:
     paths:
