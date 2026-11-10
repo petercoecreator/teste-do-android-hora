@@ -1,12 +1,25 @@
-SERVIDOR WINDOWS — RELÓGIO REMOTO
+RELÓGIO REMOTO 2.0 — SERVIDOR WINDOWS
 
-1. Tenha Python instalado no Windows.
-2. Clique com o botão direito no Prompt de Comando e escolha "Executar como administrador".
-3. Entre na pasta windows do projeto.
-4. Execute: py servidor.py
-5. Anote o PIN e o IP exibidos.
-6. No aplicativo, informe o IP e o PIN e toque em CONECTAR.
-7. Deixe a janela do servidor aberta durante o uso.
+INSTALAÇÃO
+1. Baixe RelogioRemoto-Servidor.exe na página Releases do GitHub.
+2. Salve o arquivo em uma pasta do computador.
+3. Dê dois cliques no executável.
+4. Confirme a solicitação de administrador do Windows.
+5. O servidor exibirá o IP, o PIN e abrirá o QR Code.
 
-Se o Firewall perguntar, permita somente em redes privadas.
-Não encaminhe a porta 8765 para a internet.
+CONEXÃO
+1. Deixe o servidor aberto.
+2. No Android, abra o app Relógio Remoto.
+3. Toque em LER QR CODE DO COMPUTADOR.
+4. Aponte a câmera para o QR Code exibido no Windows.
+5. Depois de conectar, use ATUALIZAR para consultar a hora.
+
+IMPORTANTE
+- PC e celular precisam estar na mesma rede Wi-Fi.
+- Se o Firewall perguntar, permita o acesso somente em redes privadas.
+- Não encaminhe a porta 8765 para a internet.
+- Para parear outro celular ou gerar novo PIN, feche e abra novamente o servidor.
+- A alteração da hora só acontece depois de tocar em APLICAR NO PC e confirmar no app.
+- A alteração do relógio pode afetar certificados, autenticação e atualizações do Windows.
+
+Se o QR Code não aparecer, abra manualmente conexao_relogio_remoto.png na mesma pasta do servidor.
