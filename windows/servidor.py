@@ -13,12 +13,20 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QPixmap, QImage, QAction, QIcon
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QLabel, QPushButton, QVBoxLayout,
+    QHBoxLayout, QFrame, QSystemTrayIcon, QMenu, QMessageBox, QCheckBox
+)
+
 PORT = 8765
 PIN = f"{secrets.randbelow(1_000_000):06d}"
 TOKEN = secrets.token_urlsafe(32)
 paired = False
 attempts = 0
 pair_lock = threading.Lock()
+http_server = None
 
 
 def is_admin():
@@ -34,15 +42,13 @@ def relaunch_as_admin():
     if getattr(sys, "frozen", False):
         executable, arguments = sys.executable, sys.argv[1:]
     else:
-        executable = sys.executable
-        arguments = [str(Path(__file__).resolve()), *sys.argv[1:]]
+        executable, arguments = sys.executable, [str(Path(__file__).resolve()), *sys.argv[1:]]
     result = ctypes.windll.shell32.ShellExecuteW(
         None, "runas", executable, subprocess.list2cmdline(arguments), None, 1
     )
     if result <= 32:
         ctypes.windll.user32.MessageBoxW(
-            None,
-            "O Relógio Remoto precisa de permissão de administrador para alterar a hora do Windows.",
+            None, "O Relógio Remoto precisa de permissão de administrador.",
             "Relógio Remoto", 0x10
         )
     return False
@@ -67,31 +73,6 @@ def local_ip():
     except OSError:
         pass
     return None
-
-
-def make_qr(host):
-    payload = {
-        "app": "RelogioRemoto", "version": 1,
-        "host": host, "port": PORT, "pin": PIN
-    }
-    try:
-        import qrcode
-        image = qrcode.make(json.dumps(payload, separators=(",", ":")))
-        try:
-            folder = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
-            output = folder / "conexao_relogio_remoto.png"
-            image.save(output)
-        except OSError:
-            output = Path(tempfile.gettempdir()) / "conexao_relogio_remoto.png"
-            image.save(output)
-        print(f"\nQR Code salvo em: {output}")
-        try:
-            os.startfile(str(output))
-        except OSError:
-            print("Abra manualmente o arquivo PNG para escanear o código.")
-    except Exception as exc:
-        print(f"\nNão foi possível gerar o QR Code: {exc}")
-        print("Use o IP e o PIN exibidos para conectar manualmente.")
 
 
 class SYSTEMTIME(ctypes.Structure):
@@ -129,10 +110,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def read_json(self):
-        try:
-            size = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            raise ValueError("Tamanho da solicitação inválido.")
+        size = int(self.headers.get("Content-Length", "0"))
         if size < 1 or size > 4096:
             raise ValueError("Solicitação vazia ou muito grande.")
         data = json.loads(self.rfile.read(size).decode("utf-8"))
@@ -166,15 +144,14 @@ class Handler(BaseHTTPRequestHandler):
             if route == "/pair":
                 with pair_lock:
                     if paired:
-                        return self.send_json(409, {"error": "Este servidor já foi conectado. Feche e abra novamente para gerar outro QR Code."})
+                        return self.send_json(409, {"error": "Este servidor já foi conectado. Gere um novo QR Code no aplicativo."})
                     attempts += 1
                     if attempts > 5:
-                        return self.send_json(429, {"error": "Limite de tentativas atingido. Reinicie o servidor."})
+                        return self.send_json(429, {"error": "Limite de tentativas atingido. Gere um novo QR Code."})
                     if not hmac.compare_digest(str(data.get("pin", "")), PIN):
                         return self.send_json(403, {"error": "PIN incorreto. Confira o QR Code do computador."})
                     paired = True
                 return self.send_json(200, {"token": TOKEN})
-
             if route == "/set":
                 if not self.authorized():
                     return self.send_json(401, {"error": "Não autorizado. Conecte novamente pelo QR Code."})
@@ -200,36 +177,215 @@ class LocalServer(ThreadingHTTPServer):
     daemon_threads = True
 
 
+def scheduled_task_exists():
+    result = subprocess.run(
+        ["schtasks", "/Query", "/TN", "Relogio Remoto"],
+        capture_output=True, text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    )
+    return result.returncode == 0
+
+
+def set_startup(enabled):
+    if getattr(sys, "frozen", False):
+        command = f'"{sys.executable}" --background'
+    else:
+        command = f'"{sys.executable}" "{Path(__file__).resolve()}" --background'
+    if enabled:
+        args = ["schtasks", "/Create", "/TN", "Relogio Remoto", "/SC", "ONLOGON",
+                "/TR", command, "/RL", "HIGHEST", "/F"]
+    else:
+        args = ["schtasks", "/Delete", "/TN", "Relogio Remoto", "/F"]
+    result = subprocess.run(args, capture_output=True, text=True,
+                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "Não foi possível alterar a inicialização automática.").strip())
+
+
+def make_qr_pixmap(host):
+    import qrcode
+    from PIL.ImageQt import ImageQt
+    payload = {"app": "RelogioRemoto", "version": 1, "host": host, "port": PORT, "pin": PIN}
+    image = qrcode.make(json.dumps(payload, separators=(",", ":"))).convert("RGB")
+    return QPixmap.fromImage(ImageQt(image))
+
+
+class MainWindow(QMainWindow):
+    def __init__(self, host):
+        super().__init__()
+        self.host = host
+        self.allow_close = False
+        self.setWindowTitle("Relógio Remoto")
+        self.setFixedSize(540, 690)
+        self.setStyleSheet("""
+            QMainWindow, QWidget { background: #0b1220; color: #edf4ff; font-family: Segoe UI; }
+            QFrame#panel { background: #152238; border: 1px solid #263a58; border-radius: 16px; }
+            QLabel#title { font-size: 25px; font-weight: 700; }
+            QLabel#muted { color: #9db0ca; font-size: 12px; }
+            QLabel#value { color: #ffffff; font-size: 20px; font-weight: 700; }
+            QPushButton { background: #2878e8; color: white; border: 0; border-radius: 10px; padding: 11px 16px; font-weight: 600; }
+            QPushButton:hover { background: #3989f5; }
+            QPushButton#secondary { background: #263a58; }
+            QCheckBox { color: #dce8f8; spacing: 8px; }
+        """)
+        root = QWidget()
+        self.setCentralWidget(root)
+        layout = QVBoxLayout(root)
+        layout.setContentsMargins(24, 22, 24, 20)
+        layout.setSpacing(13)
+
+        title = QLabel("Relógio Remoto")
+        title.setObjectName("title")
+        layout.addWidget(title)
+        subtitle = QLabel("SERVIDOR DO WINDOWS  •  CONEXÃO LOCAL SEGURA")
+        subtitle.setObjectName("muted")
+        layout.addWidget(subtitle)
+
+        panel = QFrame()
+        panel.setObjectName("panel")
+        box = QVBoxLayout(panel)
+        box.setContentsMargins(18, 16, 18, 16)
+        box.setSpacing(8)
+        self.status = QLabel("● SERVIDOR ATIVO — aguardando o celular")
+        self.status.setStyleSheet("color:#55d6a3;font-weight:700;")
+        box.addWidget(self.status)
+        ip_title = QLabel("ENDEREÇO DO COMPUTADOR")
+        ip_title.setObjectName("muted")
+        box.addWidget(ip_title)
+        self.ip_label = QLabel(f"{host or 'Não identificado'}:{PORT}")
+        self.ip_label.setObjectName("value")
+        box.addWidget(self.ip_label)
+        pin_title = QLabel("PIN DE PAREAMENTO")
+        pin_title.setObjectName("muted")
+        box.addWidget(pin_title)
+        self.pin_label = QLabel(PIN)
+        self.pin_label.setObjectName("value")
+        self.pin_label.setStyleSheet("color:#65b7ff;font-size:28px;letter-spacing:5px;")
+        box.addWidget(self.pin_label)
+        row = QHBoxLayout()
+        copy_ip = QPushButton("Copiar endereço")
+        copy_ip.setObjectName("secondary")
+        copy_ip.clicked.connect(lambda: QApplication.clipboard().setText(f"{host}:{PORT}"))
+        copy_pin = QPushButton("Copiar PIN")
+        copy_pin.setObjectName("secondary")
+        copy_pin.clicked.connect(lambda: QApplication.clipboard().setText(PIN))
+        row.addWidget(copy_ip)
+        row.addWidget(copy_pin)
+        box.addLayout(row)
+        layout.addWidget(panel)
+
+        qr_panel = QFrame()
+        qr_panel.setObjectName("panel")
+        qr_box = QVBoxLayout(qr_panel)
+        qr_box.setContentsMargins(12, 12, 12, 12)
+        qr_box.setAlignment(Qt.AlignCenter)
+        self.qr = QLabel()
+        self.qr.setAlignment(Qt.AlignCenter)
+        self.qr.setPixmap(make_qr_pixmap(host).scaled(210, 210, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        qr_box.addWidget(self.qr)
+        qr_caption = QLabel("Abra o app no celular e leia este QR Code")
+        qr_caption.setObjectName("muted")
+        qr_caption.setAlignment(Qt.AlignCenter)
+        qr_box.addWidget(qr_caption)
+        layout.addWidget(qr_panel)
+
+        self.startup = QCheckBox("Iniciar automaticamente quando eu entrar no Windows")
+        self.startup.setChecked(scheduled_task_exists())
+        self.startup.toggled.connect(self.toggle_startup)
+        layout.addWidget(self.startup)
+        buttons = QHBoxLayout()
+        regenerate = QPushButton("Gerar novo QR Code")
+        regenerate.setObjectName("secondary")
+        regenerate.clicked.connect(self.regenerate)
+        hide = QPushButton("Minimizar para bandeja")
+        hide.clicked.connect(self.hide)
+        buttons.addWidget(regenerate)
+        buttons.addWidget(hide)
+        layout.addLayout(buttons)
+        foot = QLabel("O servidor permanece ativo na bandeja do sistema. Não encaminhe a porta 8765 para a internet.")
+        foot.setObjectName("muted")
+        foot.setWordWrap(True)
+        layout.addWidget(foot)
+
+        self.tray = QSystemTrayIcon(self)
+        self.tray.setToolTip("Relógio Remoto — servidor ativo")
+        self.tray.setIcon(self.style().standardIcon(self.style().SP_ComputerIcon))
+        menu = QMenu()
+        open_action = QAction("Abrir Relógio Remoto", self)
+        open_action.triggered.connect(self.showNormal)
+        new_action = QAction("Gerar novo QR Code", self)
+        new_action.triggered.connect(self.regenerate)
+        quit_action = QAction("Encerrar servidor", self)
+        quit_action.triggered.connect(self.quit_app)
+        menu.addAction(open_action)
+        menu.addAction(new_action)
+        menu.addSeparator()
+        menu.addAction(quit_action)
+        self.tray.setContextMenu(menu)
+        self.tray.activated.connect(lambda reason: self.showNormal() if reason == QSystemTrayIcon.DoubleClick else None)
+        self.tray.show()
+
+    def toggle_startup(self, enabled):
+        try:
+            set_startup(enabled)
+        except Exception as exc:
+            self.startup.blockSignals(True)
+            self.startup.setChecked(not enabled)
+            self.startup.blockSignals(False)
+            QMessageBox.warning(self, "Inicialização automática", str(exc))
+
+    def regenerate(self):
+        global PIN, TOKEN, paired, attempts
+        with pair_lock:
+            PIN = f"{secrets.randbelow(1_000_000):06d}"
+            TOKEN = secrets.token_urlsafe(32)
+            paired = False
+            attempts = 0
+        self.pin_label.setText(PIN)
+        self.qr.setPixmap(make_qr_pixmap(self.host).scaled(210, 210, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        self.status.setText("● Novo QR Code pronto — aguardando o celular")
+        self.tray.showMessage("Relógio Remoto", "Um novo QR Code foi gerado.", QSystemTrayIcon.Information, 2500)
+
+    def closeEvent(self, event):
+        if self.allow_close:
+            event.accept()
+        else:
+            event.ignore()
+            self.hide()
+            self.tray.showMessage("Relógio Remoto", "O servidor continua ativo em segundo plano.", QSystemTrayIcon.Information, 2200)
+
+    def quit_app(self):
+        self.allow_close = True
+        self.tray.hide()
+        QApplication.quit()
+
+
 def main():
+    global http_server
     if sys.platform != "win32":
-        raise SystemExit("Este servidor deve ser executado no Windows.")
+        raise SystemExit("Este aplicativo deve ser executado no Windows.")
     if not relaunch_as_admin():
         return
-
     host = local_ip()
-    print("=" * 48)
-    print("          RELOGIO REMOTO - SERVIDOR")
-    print("=" * 48)
-    print(f"PIN DE CONEXÃO: {PIN}")
-    if host:
-        print(f"IP DESTE COMPUTADOR: {host}")
-        print(f"ENDEREÇO: http://{host}:{PORT}")
-        make_qr(host)
-    else:
-        print("Não foi possível identificar o IP da rede.")
-        print("Verifique se o computador está conectado ao Wi-Fi.")
-
-    print("\nMantenha esta janela aberta durante o uso.")
-    print("No celular, abra o app e toque em LER QR CODE.")
-    print("Use somente em uma rede Wi-Fi privada e confiável.")
-    print("Não encaminhe a porta 8765 para a internet.")
-    print("\nAguardando conexão... (Ctrl+C para encerrar)\n")
     try:
-        with LocalServer(("0.0.0.0", PORT), Handler) as server:
-            server.serve_forever()
+        http_server = LocalServer(("0.0.0.0", PORT), Handler)
     except OSError as exc:
-        print(f"Não foi possível iniciar o servidor na porta {PORT}: {exc}")
-        input("Pressione Enter para fechar...")
+        ctypes.windll.user32.MessageBoxW(
+            None, f"Não foi possível iniciar o servidor na porta {PORT}: {exc}",
+            "Relógio Remoto", 0x10
+        )
+        return
+    thread = threading.Thread(target=http_server.serve_forever, daemon=True)
+    thread.start()
+
+    app = QApplication(sys.argv)
+    app.setApplicationName("Relógio Remoto")
+    app.setQuitOnLastWindowClosed(False)
+    window = MainWindow(host)
+    if "--background" not in sys.argv:
+        window.show()
+    app.aboutToQuit.connect(http_server.shutdown)
+    app.aboutToQuit.connect(http_server.server_close)
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":
