@@ -94,6 +94,21 @@ public class MainActivity extends Activity {
             startActivity(intent);
         });
 
+        Button wallpaper = new Button(this);
+        wallpaper.setText("Aplicar na tela de bloqueio");
+        wallpaper.setAllCaps(false);
+        wallpaper.setTextColor(Color.WHITE);
+        wallpaper.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(55, 65, 105)));
+        LinearLayout.LayoutParams wp = new LinearLayout.LayoutParams(-1, dp(54));
+        wp.topMargin = dp(10);
+        page.addView(wallpaper, wp);
+        wallpaper.setOnClickListener(v -> {
+            Intent intent = new Intent("android.service.wallpaper.CHANGE_LIVE_WALLPAPER");
+            intent.putExtra("android.service.wallpaper.extra.LIVE_WALLPAPER_COMPONENT",
+                new android.content.ComponentName(this, LyricsLiveWallpaper.class));
+            startActivity(intent);
+        });
+
         TextView hint = new TextView(this);
         hint.setText("Depois, mantenha as notificações do LyricLock permitidas na tela de bloqueio.");
         hint.setTextSize(12);
