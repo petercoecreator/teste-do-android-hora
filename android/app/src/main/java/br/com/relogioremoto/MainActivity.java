@@ -1,6 +1,7 @@
 package br.com.relogioremoto;
 
-import android.app.*;\nimport android.content.pm.PackageManager;\nimport androidx.core.app.ActivityCompat;\nimport androidx.core.content.ContextCompat;\nimport com.journeyapps.barcodescanner.CaptureActivity;
+import android.app.*;
+import android.content.pm.PackageManager;\nimport androidx.core.app.ActivityCompat;\nimport androidx.core.content.ContextCompat;\nimport com.journeyapps.barcodescanner.CaptureActivity;
 import android.os.Bundle;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -350,8 +351,21 @@ public class MainActivity extends Activity {
         }
     }
 
+    private static final int CAMERA_REQUEST = 731;
+
     private void scanQr() {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{android.Manifest.permission.CAMERA}, CAMERA_REQUEST);
+            return;
+        }
+        launchQrScanner();
+    }
+
+    private void launchQrScanner() {
         new IntentIntegrator(this)
+            .setCaptureActivity(CaptureActivity.class)
             .setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
             .setPrompt("Aponte a câmera para o QR Code exibido no computador")
             .setBeepEnabled(false)
@@ -359,7 +373,19 @@ public class MainActivity extends Activity {
             .initiateScan();
     }
 
-    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {\n        super.onRequestPermissionsResult(requestCode, permissions, grantResults);\n        if (requestCode == CAMERA_REQUEST) {\n            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) launchQrScanner();\n            else message("A permissão da câmera é necessária para ler o QR Code. Você também pode conectar digitando o IP e o PIN.");\n        }\n    }\n\n    @Override protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CAMERA_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                launchQrScanner();
+            } else {
+                message("A permissão da câmera é necessária para ler o QR Code. Você também pode conectar digitando o IP e o PIN.");
+            }
+        }
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
         IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
         if (result != null) {
             if (result.getContents() != null) {
