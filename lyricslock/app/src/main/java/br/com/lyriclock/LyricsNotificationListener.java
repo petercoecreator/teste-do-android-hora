@@ -19,6 +19,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.io.BufferedReader;
+import java.io.FileOutputStream;
+import android.graphics.Bitmap;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -83,12 +85,12 @@ public class LyricsNotificationListener extends NotificationListenerService {
                 return;
             }
             MediaMetadata md = spotify.getMetadata();
-            if (md != null) ensureLyrics(
+            if (md != null) { saveTrack(md); ensureLyrics(
                 md.getString(MediaMetadata.METADATA_KEY_TITLE),
                 md.getString(MediaMetadata.METADATA_KEY_ARTIST),
                 md.getString(MediaMetadata.METADATA_KEY_ALBUM),
                 md.getLong(MediaMetadata.METADATA_KEY_DURATION)
-            );
+            ); }
         } catch (SecurityException ignored) { }
     }
 
@@ -101,6 +103,7 @@ public class LyricsNotificationListener extends NotificationListenerService {
                     MediaMetadata md = c.getMetadata();
                     PlaybackState ps = c.getPlaybackState();
                     if (md != null && ps != null && ps.getState() == PlaybackState.STATE_PLAYING) {
+                        saveTrack(md);
                         ensureLyrics(md.getString(MediaMetadata.METADATA_KEY_TITLE),
                             md.getString(MediaMetadata.METADATA_KEY_ARTIST),
                             md.getString(MediaMetadata.METADATA_KEY_ALBUM),
@@ -115,6 +118,22 @@ public class LyricsNotificationListener extends NotificationListenerService {
             handler.postDelayed(this, 650);
         }
     };
+
+    private void saveTrack(MediaMetadata md) {
+        try {
+            android.content.SharedPreferences.Editor e = getSharedPreferences("lyriclock_live", MODE_PRIVATE).edit();
+            e.putString("title", md.getString(MediaMetadata.METADATA_KEY_TITLE));
+            e.putString("artist", md.getString(MediaMetadata.METADATA_KEY_ARTIST));
+            e.apply();
+            Bitmap art = md.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
+            if (art == null) art = md.getBitmap(MediaMetadata.METADATA_KEY_ART);
+            if (art != null) {
+                try (FileOutputStream out = openFileOutput("spotify-cover.jpg", MODE_PRIVATE)) {
+                    art.compress(Bitmap.CompressFormat.JPEG, 88, out);
+                }
+            }
+        } catch (Exception ignored) { }
+    }
 
     private long positionNow(PlaybackState state) {
         long elapsed = Math.max(0, android.os.SystemClock.elapsedRealtime() - state.getLastPositionUpdateTime());
@@ -212,6 +231,9 @@ public class LyricsNotificationListener extends NotificationListenerService {
     }
 
     private void showFourLines(int current) {
+        android.content.SharedPreferences.Editor live = getSharedPreferences("lyriclock_live", MODE_PRIVATE).edit();
+        for (int i = 0; i < 4; i++) live.putString("line" + i, current + i < lyricLines.size() ? lyricLines.get(current + i).text : "");
+        live.apply();
         RemoteViews compact = new RemoteViews(getPackageName(), R.layout.lyrics_notification);
         RemoteViews expanded = new RemoteViews(getPackageName(), R.layout.lyrics_notification_expanded);
         for (int i = 0; i < 4; i++) {
